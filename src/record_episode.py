@@ -63,6 +63,12 @@ def record_episode(config: dict, model_file: str, output_file: str = None) -> No
         full_action_space=False,
         render_mode=config["env"]["render_mode"]
     )
+    env = gym.wrappers.RecordVideo(
+        env,
+        video_folder=config["output"]["record_path"],
+        step_trigger=lambda x: x % 100 == 0,
+        name_prefix=config["model"],
+    )
 
     env = MaxAndSkipEnv(env, skip=config["hyper_params"]["skip_frame"])
     env = PreproWrapper(
@@ -88,13 +94,6 @@ def record_episode(config: dict, model_file: str, output_file: str = None) -> No
     print("- Model file:\t{}".format(model_file))
     print("=" * 50)
     print("")
-
-    env = gym.wrappers.RecordVideo(
-        env,
-        video_folder=video_folder,
-        step_trigger=lambda x: x % 100 == 0,
-        name_prefix=name_prefix
-    )
 
     if config["model"] == "dqn":
         # initialize model and load model weights
