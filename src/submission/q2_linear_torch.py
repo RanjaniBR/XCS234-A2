@@ -54,6 +54,28 @@ class Linear(DQN):
         img_height, img_width, n_channels = state_shape
         num_actions = self.env.action_space.n
         ### START CODE HERE ###
+        state_history = self.config["hyper_params"]["state_history"]
+        input_dim = img_height * img_width * n_channels * state_history
+
+        self.q_network = nn.Linear(input_dim, num_actions)
+        nn.init.xavier_uniform_(self.q_network.weight)
+        if self.q_network.bias is not None:
+            nn.init.zeros_(self.q_network.bias)
+
+        self.target_network = nn.Linear(input_dim, num_actions)
+        # Copy weights from q to target
+        self.target_network.load_state_dict(self.q_network.state_dict())
+        for p in self.target_network.parameters():
+            p.requires_grad = False
+
+        # Optional alias if other code expects self.network
+        self.network = self.q_network
+
+        # Move to device if attribute exists
+        device = getattr(self, "device", None)
+        if device is not None:
+            self.q_network.to(device)
+            self.target_network.to(device)
         ### END CODE HERE ###
 
     ############################################################
@@ -85,6 +107,16 @@ class Linear(DQN):
         out = None
 
         ### START CODE HERE ###
+        # Select network object (expects attributes: q_network, target_network)
+        net = getattr(self, network)
+        # Flatten spatial and channel dims into a single feature vector per batch element
+        x = torch.flatten(state, start_dim=1)
+        # Forward pass
+        if network == "target_network":
+            with torch.no_grad():
+                out = net(x)
+        else:
+            out = net(x)
         ### END CODE HERE ###
 
         return out
@@ -107,6 +139,11 @@ class Linear(DQN):
         """
 
         ### START CODE HERE ###
+        # Copy online network weights into target network
+        self.target_network.load_state_dict(self.q_network.state_dict())
+        # Keep target network frozen
+        for p in self.target_network.parameters():
+            p.requires_grad = False
         ### END CODE HERE ###
 
     ############################################################
@@ -164,6 +201,20 @@ class Linear(DQN):
         """
         gamma = self.config["hyper_params"]["gamma"]
         ### START CODE HERE ###
+        q_sa = torch.gather(q_values, 1, actions.to(torch.int64).unsqueeze(1)).squeeze(1)
+
+        # max_a' Q_target(s', a')
+        max_target_q = torch.max(target_q_values, dim=1).values
+
+        # done mask (terminated or truncated)
+        done_mask = torch.bitwise_or(terminated_mask, truncated_mask)
+
+        # Q_samp(s)
+        q_samp = rewards + gamma * max_target_q * (~done_mask)
+
+        # MSE loss
+        loss = torch.mean((q_samp - q_sa) ** 2)
+        return loss
         ### END CODE HERE ###
 
     ############################################################
@@ -182,4 +233,9 @@ class Linear(DQN):
             What are the input to the optimizer's constructor?
         """
         ### START CODE HERE ###
+        """
+           This function sets the optimizer for our linear network
+           """
+        lr = self.config["hyper_params"].get("learning_rate", 1e-3)
+        self.optimizer = torch.optim.Adam(self.q_network.parameters(), lr=lr)
         ### END CODE HERE ###

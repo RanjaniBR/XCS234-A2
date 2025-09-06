@@ -59,6 +59,25 @@ class NatureQN(Linear):
         img_height, img_width, n_channels = state_shape
         num_actions = self.env.action_space.n
         ### START CODE HERE ###
+
+        in_channels = n_channels * self.config["hyper_params"]["state_history"]
+
+        def create_dqn():
+            return nn.Sequential(
+                nn.Conv2d(in_channels, 32, kernel_size=8, stride=4, padding=2),  # padding=2 as per requirement
+                nn.ReLU(),
+                nn.Conv2d(32, 64, kernel_size=4, stride=2),
+                nn.ReLU(),
+                nn.Conv2d(64, 64, kernel_size=3, stride=1),
+                nn.ReLU(),
+                nn.Flatten(),
+                nn.Linear(3136, 512),  # 64 feature maps of size 7x7 → 64*7*7 = 3136
+                nn.ReLU(),
+                nn.Linear(512, num_actions)
+            )
+
+        self.q_network = create_dqn()
+        self.target_network = create_dqn()
         ### END CODE HERE ###
 
     ############################################################
@@ -89,6 +108,18 @@ class NatureQN(Linear):
         out = None
 
         ### START CODE HERE ###
+        state = state.permute(0, 3, 1, 2)
+
+        # Select network
+        if network == "q_network":
+            net = self.q_network
+        elif network == "target_network":
+            net = self.target_network
+        else:
+            raise ValueError(f"Unknown network name: {network}")
+
+        # Forward pass
+        out = net(state)
         ### END CODE HERE ###
 
         return out

@@ -53,6 +53,11 @@ class LinearSchedule(object):
                 self.epsilon value, which is self.eps_end.
         """
         ### START CODE HERE ###
+        if t >= self.nsteps:
+            self.epsilon = self.eps_end
+        else:
+            decay_rate = (self.eps_begin - self.eps_end) / self.nsteps
+            self.epsilon = self.eps_begin - decay_rate * t
         ### END CODE HERE ###
 
 
@@ -91,6 +96,10 @@ class LinearExploration(LinearSchedule):
                 env.action_space.sample() to generate a random action
         """
         ### START CODE HERE ###
+        if np.random.rand() < self.epsilon:
+            return self.env.action_space.sample()
+        else:
+            return best_action
         ### END CODE HERE ###
 
 
